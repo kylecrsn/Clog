@@ -8,19 +8,29 @@
 
 ## Getting Started
 
-In the simple example program below, we first initialize the properties for the internal ClLogProps instance to their defaults. This is all that's needed to start logging information to the console! By default, the default global severity level is INFO, so in order to demonstrate each logging function, we then set the level property to ALL.
+In the simple example program below, we first initialize the properties for the internal ClLogProps instance to their defaults. This is all that's needed to start logging information to the console! We then print some messages showcasing features such as variadic parameter passing and colored console output. By default, the global severity level is INFO, thus the less important DEBUG and TRACE messages won't be printed unless we set the level property accordingly. This can be found in `examples/console_all_levels.c`.
 
 ```c
 #include "clog.h"
 
 int main(int argc, char *argv[]) {
+  // Initialize internal ClLogProps instance ot sensible defaults
   ClInitLogProps();
-  ClSetPropLevel(CL_LOG_LEVEL_ALL);
+
+  LOG_INFO("This is a basic logging message");
+
+  LOG_INFO("This message includes %d substitutions thanks to %s functions", 2, "variadic");
 
   LOG_FATAL("This is a fatal message");
   LOG_ERROR("This is an error message");
   LOG_WARN("This is a warning message");
   LOG_INFO("This is an information message");
+
+  // The default level property value is CL_LOG_LEVEL_INFO, thus this won't print
+  LOG_DEBUG("This is a debugging message (that never gets printed)");
+
+  // Change the level property to print all levels of messages
+  ClSetPropLevel(CL_LOG_LEVEL_ALL);
   LOG_DEBUG("This is a debugging message");
   LOG_TRACE("This is a tracing message");
 

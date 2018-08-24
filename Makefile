@@ -12,7 +12,7 @@ OUT 		 = bin
 ROOT_DIR = $(shell dirname $(realpath $(lastword $(MAKEFILE_LIST))))
 SRC_DIR  = $(ROOT_DIR)/src
 CL_SRC   = $(wildcard $(SRC_DIR)/*.c)
-CL_OBJ   = $(patsubst $(SRC_DIR)/*.c,$(SRC_DIR)/$(OUT)/%.o,$(CL_SRC))
+CL_OBJ   = $(patsubst $(SRC_DIR)/%.c,$(SRC_DIR)/$(OUT)/%.o,$(CL_SRC))
 
 .PHONY: all src examples tests clean
 

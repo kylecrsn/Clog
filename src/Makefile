@@ -1,11 +1,8 @@
-# Compilation
-OBJECTS = $(CL_SRC:.c=.o)
-
 .PHONY: all clean
 
-all: $(OBJECTS)
+all: $(CL_OBJ)
 
-%.o: %.c
+$(SRC_DIR)/$(OUT)/%.o: %.c
 	$(MKD) $(OUT)
 	$(CC) $(CFLAGS) -I $(SRC_DIR) -c $< -o $@
 
