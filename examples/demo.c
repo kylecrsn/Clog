@@ -1,18 +1,10 @@
-# Clog [![Build Status](https://travis-ci.org/carsonkk/Clog.svg?branch=master)](https://travis-ci.org/carsonkk/Clog)
-
-> A simple, versatile logging library for C
-
-## About
-
-**Clog** is a logging library that's designed to be as straightforward as possible to use from the get-go. It avoids any sort of dynamic memory allocation and gives the user a clear interface for setting and checking the properties used by the internal logging function. It has a hierarchical log severity level similar to many other libraries, along with additional features such as colored console output and max file size rollover.
-
-## Getting Started
-
-In the sample program below, we demonstrate nearly all of the functionality the library has to offer.
-
-```c
 #include "clog.h"
 
+/*
+ * A (nearly) fully featured demo for the README showcasing functionality including console/disk 
+ * printing, colored console output, variadic substitution, global severity level enforcement, 
+ * and log rollover.
+ */
 int main(int argc, char *argv[]) {
   int i;
 
@@ -65,6 +57,3 @@ int main(int argc, char *argv[]) {
 
   return 0;
 }
-```
-
-All of these functions and more are available for getting, setting, and controlling the output of the library. For full documentation on the API check out `docs/`, and for more sample programs check out `examples/`.

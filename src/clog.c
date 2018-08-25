@@ -1,6 +1,9 @@
 #include "clog.h"
 
 static ClLogProps logProps;
+static FILE *fp;
+static int currRolloverAppend;
+static unsigned long currLogLen;
 static const char *simpleFormat = "%s %s %-5s (%s:%d): ";
 static const char *coloredFormat = "%s %s %s%-5s%s %s(%s:%d)%s: ";
 static const char *colorBlack = "\x1b[90m";
@@ -14,20 +17,35 @@ static const char *colors[] = {
 
 
 void ClInitLogProps() {
-  logProps.fp = NULL;
   logProps.level = CL_LOG_LEVEL_INFO;
-  logProps.console = CL_CONSOLE_ON;
+  logProps.stream = CL_STREAM_ALL;
   logProps.color = CL_COLOR_ON;
+  logProps.rollover = 8388608;
+  logProps.filename = NULL;
+  fp = NULL;
+  currRolloverAppend = 1;
+  currLogLen = 0;
 }
 
 void ClLoadLogProps(ClLogProps props) {
-  logProps.fp = props.fp;
+  if(fp != NULL) {
+    fclose(fp);
+  }
   logProps.level = props.level;
-  logProps.console = props.console;
+  logProps.stream = props.stream;
   logProps.color = props.color;
+  logProps.rollover = props.rollover;
+  logProps.filename = props.filename;
+  //TODO: error: handling
+  fp = fopen(logProps.filename, "a");
+  currRolloverAppend = 1;
+  currLogLen = 0;
 }
 
 void ClResetLogProps() {
+  if(fp != NULL) {
+    fclose(fp);
+  }
   ClInitLogProps();
 }
 
@@ -39,12 +57,12 @@ ClLogLevels ClGetPropLevel() {
   return logProps.level;
 }
 
-void ClSetPropConsole(ClConsole console) {
-  logProps.console = console;
+void ClSetPropStream(ClStreams stream) {
+  logProps.stream = stream;
 }
 
-ClConsole ClGetPropConsole() {
-  return logProps.console;
+ClStreams ClGetPropStream() {
+  return logProps.stream;
 }
 
 void ClSetPropColor(ClColor color) {
@@ -55,22 +73,38 @@ ClColor ClGetPropColor() {
   return logProps.color;
 }
 
-void ClSetPropFp(FILE *fp) {
-  logProps.fp = fp;
+void ClSetPropRollover(long rollover) {
+  if(rollover < 1024) {
+    logProps.rollover = 1024;
+  }
+  else if(rollover > LONG_MAX) {
+    logProps.rollover = LONG_MAX;
+  }
+  else {
+    logProps.rollover = rollover;
+  }
 }
 
-FILE *ClGetPropFp() {
-  return logProps.fp;
+long ClGetPropRollover() {
+  return logProps.rollover;
 }
 
-void ClLog(ClMsgLevels level, const char *filename, int line, const char *message, ...) {
-  FILE *cp;
-  va_list args;
+void ClSetPropFilename(char *filename) {
+  logProps.filename = filename;
+}
 
+char *ClGetPropFilename() {
+  return logProps.filename;
+}
+
+void ClLog(ClMsgLevels level, const char *srcFilename, int srcLine, const char *message, ...) {
   // Only consider logging if the message's level is within the global level bound
   if(logProps.level >= (ClLogLevels)level) {
     // Only print to the console if enabled
-    if(logProps.console == CL_CONSOLE_ON) {
+    if(logProps.stream == CL_STREAM_ALL || logProps.stream == CL_STREAM_CONSOLE) {
+      FILE *cp;
+      va_list args;
+
       // Print to either stdout or stderr depending on the level given for this message
       if(level == CL_MSG_LEVEL_ERROR || level == CL_MSG_LEVEL_FATAL) {
         cp = stderr;
@@ -82,10 +116,10 @@ void ClLog(ClMsgLevels level, const char *filename, int line, const char *messag
       // Only use colored console printing if enabled
       if(logProps.color == CL_COLOR_ON) {
         fprintf(cp, coloredFormat, __DATE__, __TIME__, colors[level], levels[level], 
-                colorReset, colorBlack, filename, line, colorReset);
+                colorReset, colorBlack, srcFilename, srcLine, colorReset);
       }
       else {
-        fprintf(cp, simpleFormat, __DATE__, __TIME__, levels[level], filename, line);
+        fprintf(cp, simpleFormat, __DATE__, __TIME__, levels[level], srcFilename, srcLine);
       }
 
       // Print the logging message along with any option parameters
@@ -97,14 +131,51 @@ void ClLog(ClMsgLevels level, const char *filename, int line, const char *messag
     }
 
     // Only print to the file pointer if one was provided
-    if(logProps.fp != NULL) {
-      // Print the logging message along with any option parameters
-      fprintf(logProps.fp, simpleFormat, __DATE__, __TIME__, levels[level], filename, line);
-      va_start(args, message);
-      vfprintf(logProps.fp, message, args);
-      va_end(args);
-      fprintf(logProps.fp, "\n");
-      fflush(logProps.fp);
+    if(logProps.stream == CL_STREAM_ALL || logProps.stream == CL_STREAM_DISK) {
+      va_list args;
+
+      // Make sure a valid filename was actually provided
+      if(logProps.filename != NULL) {
+        // Open the file pointer if it wasn't open already
+        if(fp == NULL) {
+          fp = fopen(logProps.filename, "a");
+          currLogLen = ftell(fp);
+        }
+
+        // Print the logging message along with any option parameters
+        currLogLen += fprintf(fp, simpleFormat, __DATE__, __TIME__, levels[level], srcFilename, 
+                              srcLine);
+        va_start(args, message);
+        currLogLen += vfprintf(fp, message, args);
+        va_end(args);
+        currLogLen += fprintf(fp, "\n");
+        fflush(fp);
+
+        // Perform log rollover if necessary
+        if(logProps.rollover < currLogLen) {
+          int len = (int)strlen(logProps.filename);
+          char rolledFilename[len+3+(int)floor(log10(currRolloverAppend))];
+          FILE *tp;
+
+          while(1) {
+            //TODO: edge case where restarting program after 10 or more rolls have occurred, buffer size
+            sprintf(rolledFilename, "%s.%d", logProps.filename, currRolloverAppend);
+            tp = fopen(rolledFilename, "r");
+            if(tp != NULL) {
+              fclose(tp);
+              currRolloverAppend++;
+            }
+            else {
+              break;
+            }
+          }
+          fclose(fp);
+          rename(logProps.filename, rolledFilename);
+          fp = fopen(logProps.filename, "a");
+          currRolloverAppend++;
+          currLogLen = 0;
+        }
+      }
     }
   }
 }

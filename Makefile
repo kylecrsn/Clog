@@ -4,11 +4,11 @@ export
 # Commands and options
 MKD    = mkdir -p
 RMD    = rm -rf
-CC 		 = gcc
-CFLAGS = -Wall -g
+CC     = gcc
+CFLAGS = -Wall -pedantic -g
 
 # Compilation
-OUT 		 = bin
+OUT      = bin
 ROOT_DIR = $(shell dirname $(realpath $(lastword $(MAKEFILE_LIST))))
 SRC_DIR  = $(ROOT_DIR)/src
 CL_SRC   = $(wildcard $(SRC_DIR)/*.c)
