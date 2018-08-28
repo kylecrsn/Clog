@@ -23,7 +23,7 @@ int main(int argc, char *argv[]) {
   // A simple message.
   LOG_INFO("This is a basic logging message.");
 
-  // Format substitutions similar to built-in functions like printf().
+  // Format substituion similar to built-in functions like printf().
   LOG_INFO("This message includes %d substitutions, similar to how %s work.", 2, 
            "printf(), fprintf(), etc.");
 
@@ -47,10 +47,10 @@ int main(int argc, char *argv[]) {
   LOG_INFO("This will be printed to the console, as well as \"demo.log\" as its first entry.");
 
   // Now we'll change the stream property temporarily so we're only printing to the file, and 
-  // change the rollover property to 2048 bytes. Then we'll force a log rollover to occur.
+  // change the rollover property to 1024 bytes. Then we'll force a log rollover to occur.
   ClSetPropStream(CL_STREAM_DISK);
-  ClSetPropRollover(2048);
-  for(i = 0; i < 15; i++) {
+  ClSetPropRollover(1024);
+  for(i = 0; i < 7; i++) {
     LOG_INFO("This message is 116 characters long including the info that comes before it.");
   }
   LOG_INFO("This message will cause the file to exceed the rollover value, which triggers it to "
