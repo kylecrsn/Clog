@@ -8,7 +8,7 @@
 
 ## Getting Started
 
-In the sample program below, we demonstrate nearly all of the functionality the library has to offer.
+The sample program below demonstrates nearly all of the functionality the library has to offer.
 
 ```c
 #include "clog.h"
@@ -16,13 +16,14 @@ In the sample program below, we demonstrate nearly all of the functionality the 
 int main(int argc, char *argv[]) {
   int i;
 
-  // Initialize the internal ClLogProps instance to sensible defaults.
+  // Initialize the internal ClLogProps instance to sensible defaults. This is the first and only 
+  // needed to get going.
   ClInitLogProps();
 
   // A simple message.
   LOG_INFO("This is a basic logging message.");
 
-  // Format substituion similar to built-in functions like printf().
+  // Format substitutions similar to built-in functions like printf().
   LOG_INFO("This message includes %d substitutions, similar to how %s work.", 2, 
            "printf(), fprintf(), etc.");
 

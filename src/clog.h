@@ -6,6 +6,10 @@
 #include <math.h>
 #include <limits.h>
 #include <stdarg.h>
+#include <stdlib.h>
+#include <sys/types.h>
+#include <unistd.h>
+#include <time.h>
 
 /*
  * Description:
@@ -28,22 +32,17 @@
  * - Just like functions such as printf, fprintf, etc, if your optional arguments don't match your 
  * format specifiers, or vice versa, the behavior is undefined and can result in garbage output.
  */
-#define LOG_FATAL(...) ClLog(CL_MSG_LEVEL_FATAL, __FILE__, __LINE__, __VA_ARGS__)
-#define LOG_ERROR(...) ClLog(CL_MSG_LEVEL_ERROR, __FILE__, __LINE__, __VA_ARGS__)
-#define LOG_WARN(...)  ClLog(CL_MSG_LEVEL_WARN,  __FILE__, __LINE__, __VA_ARGS__)
-#define LOG_INFO(...)  ClLog(CL_MSG_LEVEL_INFO,  __FILE__, __LINE__, __VA_ARGS__)
-#define LOG_DEBUG(...) ClLog(CL_MSG_LEVEL_DEBUG, __FILE__, __LINE__, __VA_ARGS__)
-#define LOG_TRACE(...) ClLog(CL_MSG_LEVEL_TRACE, __FILE__, __LINE__, __VA_ARGS__)
+#define LOG_FATAL(...) ClLog(CL_MSG_LEVEL_FATAL, __FILE__, __LINE__, __FUNCTION__, __VA_ARGS__)
+#define LOG_ERROR(...) ClLog(CL_MSG_LEVEL_ERROR, __FILE__, __LINE__, __FUNCTION__, __VA_ARGS__)
+#define LOG_WARN(...)  ClLog(CL_MSG_LEVEL_WARN,  __FILE__, __LINE__, __FUNCTION__, __VA_ARGS__)
+#define LOG_INFO(...)  ClLog(CL_MSG_LEVEL_INFO,  __FILE__, __LINE__, __FUNCTION__, __VA_ARGS__)
+#define LOG_DEBUG(...) ClLog(CL_MSG_LEVEL_DEBUG, __FILE__, __LINE__, __FUNCTION__, __VA_ARGS__)
+#define LOG_TRACE(...) ClLog(CL_MSG_LEVEL_TRACE, __FILE__, __LINE__, __FUNCTION__, __VA_ARGS__)
 
 /*
  * Description:
  * Macro function which allows the user to pass any level parameter of type ClMsgLevel to the 
  * internal logging function.
- * 
- * Warning: 
- * This is not the recommended way of logging info. While there are no mal-side-effects
- * of using this, it requires an extra parameter of what is normally an internal enumeration type 
- * and should instead only be used sparingly when conditional level-selection for a message is needed.
  * 
  * Parameters:
  * - level:
@@ -59,7 +58,7 @@
  *    - Description: One or more values of any type which correspond to the format specifier(s) in 
  *    the message string.
  */
-#define LOG(level, ...) ClLog(level, __FILE__, __LINE__, __VA_ARGS__)
+#define LOG(level, ...) ClLog(level, __FILE__, __LINE__, __FUNCTION__, __VA_ARGS__)
 
 /*
  * Description:
@@ -84,6 +83,24 @@ typedef enum cl_log_levels_e {
   CL_LOG_LEVEL_TRACE = 5,
   CL_LOG_LEVEL_ALL   = CL_LOG_LEVEL_TRACE
 } ClLogLevels;
+
+/*
+ * Description:
+ * Enumeration describing each logging level for a specific message.
+ * 
+ * Notes:
+ * - This is only meant to be used when using the LOG() macro function above as the first parameter 
+ * which describes the level you want a specific log message to be. When setting/getting the global 
+ * log level, use ClLogLevels above.
+ */
+typedef enum cl_msg_levels_e {
+  CL_MSG_LEVEL_FATAL = CL_LOG_LEVEL_FATAL,
+  CL_MSG_LEVEL_ERROR = CL_LOG_LEVEL_ERROR,
+  CL_MSG_LEVEL_WARN  = CL_LOG_LEVEL_WARN,
+  CL_MSG_LEVEL_INFO  = CL_LOG_LEVEL_INFO,
+  CL_MSG_LEVEL_DEBUG = CL_LOG_LEVEL_DEBUG,
+  CL_MSG_LEVEL_TRACE = CL_LOG_LEVEL_TRACE
+} ClMsgLevels;
 
 /*
  * Description:
@@ -149,6 +166,7 @@ typedef struct cl_log_props_s {
   ClColor     color;
   long        rollover;
   char *      filename;
+  char *      format;
 } ClLogProps;
 
 /*
@@ -270,23 +288,23 @@ void ClSetPropFilename(char *filename);
  */
 char *ClGetPropFilename();
 
-/*
- * [INTERNAL]
- * Description:
- * Enumeration describing each logging level.
- * 
- * Warning:
- * This is used internally by the library and should not be referenced in your code, unless you
- * are using the LOG() macro function.
- */
-typedef enum cl_msg_levels_e {
-  CL_MSG_LEVEL_FATAL = CL_LOG_LEVEL_FATAL,
-  CL_MSG_LEVEL_ERROR = CL_LOG_LEVEL_ERROR,
-  CL_MSG_LEVEL_WARN  = CL_LOG_LEVEL_WARN,
-  CL_MSG_LEVEL_INFO  = CL_LOG_LEVEL_INFO,
-  CL_MSG_LEVEL_DEBUG = CL_LOG_LEVEL_DEBUG,
-  CL_MSG_LEVEL_TRACE = CL_LOG_LEVEL_TRACE
-} ClMsgLevels;
+typedef enum cl_fmt_type_e {
+  CL_FMT_TYPE_STRING     = 0,
+  CL_FMT_TYPE_TEXT_COLOR = 1,
+  CL_FMT_TYPE_TEXT_RESET = 2,
+  CL_FMT_TYPE_TIME       = 3,
+  CL_FMT_TYPE_LEVEL      = 4,
+  CL_FMT_TYPE_FILENAME   = 5,
+  CL_FMT_TYPE_LINE       = 6,
+  CL_FMT_TYPE_FUNCTION   = 7,
+  CL_FMT_TYPE_PROCESS_ID = 8,
+  CL_FMT_TYPE_MESSAGE    = 9
+} ClFmtType;
+
+typedef struct cl_fmt_chunk_s {
+  ClFmtType type;
+  char *    str;
+} ClFmtChunk;
 
 /*
  * [INTERNAL]
@@ -297,6 +315,7 @@ typedef enum cl_msg_levels_e {
  * This is used internally by the library and should not be referenced directly in your code. 
  * Instead use any of the macro functions defined above.
  */
-void ClLog(ClMsgLevels level, const char *srcFilename, int srcLine, const char *message, ...);
+void ClLog(ClMsgLevels level, const char *filename, int line, 
+           const char *function, const char *message, ...);
 
 #endif

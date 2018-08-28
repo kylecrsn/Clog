@@ -5,7 +5,7 @@ export
 MKD    = mkdir -p
 RMD    = rm -rf
 CC     = gcc
-CFLAGS = -Wall -pedantic -g
+CFLAGS = -Wall -g
 
 # Compilation
 OUT      = bin
