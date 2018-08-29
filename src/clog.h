@@ -185,6 +185,21 @@ void ClInitLogProps();
 
 /*
  * Description:
+ * Frees any dynamically allocated memory and closes any open file pointers.
+ */
+void ClCleanupLogProps();
+
+/*
+ * Description:
+ * Resets the values of the internal ClLogProps instance to the defaults.
+ * 
+ * Notes:
+ * - This is effectively the same as calling ClCleanupLogProps() followed by ClInitProps().
+ */
+void ClResetLogProps();
+
+/*
+ * Description:
  * Load the values from a user-declared instance of ClLogProps into the internal instance
  * 
  * Parameters:
@@ -193,16 +208,6 @@ void ClInitLogProps();
  *    - Description: a user-defined instance of ClLogProps
  */
 void ClLoadLogProps(ClLogProps props);
-
-/*
- * Description:
- * Resets the values of the internal ClLogProps instance to the defaults.
- * 
- * Notes:
- * - This is effectively the same as calling ClInitProps() with the added caveat that it first 
- * checks if the internal file pointer is not NULL, and closes it if that is the case.
- */
-void ClResetLogProps();
 
 /*
  * Description: Function that sets the global maximum level of log messages that will be recorded.
@@ -279,7 +284,7 @@ long ClGetPropRollover();
  * - filename:
  *    - Type: char *
  *    - Description: The filename corresponding to the target file for writing logs. If this file 
- * already exists, it will be appended to until the log rollover limit is reached.
+ *    already exists, it will be appended to until the log rollover limit is reached.
  */
 void ClSetPropFilename(char *filename);
 
@@ -287,6 +292,76 @@ void ClSetPropFilename(char *filename);
  * Description: Function that gets the filename to be used when logging to disk.
  */
 char *ClGetPropFilename();
+
+/*
+ * Description: Function that sets the format string to use for printing each log message.
+ * 
+ * Parameters:
+ * - format:
+ *    - Type: char *
+ *    - Description: A string of custom specifiers representing the format to be used when printing 
+ *    each message. The available specifiers are:
+ * - %c*
+ *    - Name: Text Color
+ *    - Description: Indicates that any text following this specifier, until the Text Reset 
+ *    specifier is found, should be of the color specified by the asterisk (*). The asterisk can be 
+ *    any of the following:
+ *        - k/K: Black/Bright Black
+ *        - r/R: Red/Bright Red
+ *        - g/G: Green/Bright Green
+ *        - y/Y: Yellow/Bright Yellow
+ *        - b/B: Blue/Bright Blue
+ *        - m/M: Magenta/Bright Magenta
+ *        - c/C: Cyan/Bright Cyan
+ *        - w/W: White/Bright White
+ * - %r
+ *    - Name: Text Reset
+ *    - Description: Disables any previously set text modifiers, including Text Color.
+ * - %t{*}
+ *    - Name: Time
+ *    - Description: Any type of time-related text represented by strftime()'s specifiers, 
+ *    specified here as an asterisk (*). The contents of the curly braces get passed to strftime() 
+ *    as its format string, while the curly braces are consumed by the internal parsing function.
+ * - %l
+ *    - Name: Level
+ *    - Description: Severity level of the message.
+ * - %F
+ *    - Name: Filename
+ *    - Description: The name of the file that the message was generated in.
+ * - %L
+ *    - Name: Line
+ *    - Description: The line number in the file that the logging message was generated in.
+ * - %f
+ *    - Name: Function
+ *    - Description: The function in the file that the logging message was generated in.
+ * - %p
+ *    - Name: Process ID
+ *    - Description: The process id of the process in which the log message was generated.
+ * - %m
+ *    - Name: Message
+ *    - Description: The string(s) passed by the user as the actual message of the log entry.
+ *
+ * Notes:
+ * - If the character that immediately follows a percent sign in the string isn't a valid 
+ * specifier, that percent sign and its following character are interpretted literally.
+ * - For a Text Color specifier, the actual color character should directly follow the specifier. 
+ * For example, "%cG" indicates that all text that follows it should be Bright Green, until the 
+ * Text Reset specifier is encountered. If no Text Reset specifier is encountered, all of the text 
+ * that follows it would be Bright Green. If the color character that comes after the specifier is 
+ * not a valid color character, the specifier is instead interpretted literally.
+ * - For a Time specifier, an opening and closing curly brace should immediately follow the 
+ * specifier, with the intent that anything in between them be passed to strftime(). For example, 
+ * "%t{%Y-%m-%d}" would translate to "YYYY-MM-DD", or the year, month, and day of the logging 
+ * message. Documentation on valid specifiers for inside of the curly braces can be found in any 
+ * <time.h> documentation that supports it. If no closing curly brace is ever found, the specifier 
+ * and opening curly brace are interpetted literally.
+ */
+void ClSetPropFormat(char *format);
+
+/*
+ * Description: Function that gets format string to use for printing each log message.
+ */
+char *ClGetPropFormat();
 
 typedef enum cl_fmt_type_e {
   CL_FMT_TYPE_STRING     = 0,

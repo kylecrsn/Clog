@@ -1,6 +1,7 @@
 # Project-specific files/folders
 bin/
 NOTES.md
+*.log*
 
 # Object files
 *.o

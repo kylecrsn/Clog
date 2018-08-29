@@ -1,21 +1,21 @@
 #include "clog.h"
 
-static ClLogProps logProps;
-static ClFmtChunk *format;
-static int formatLen;
-static FILE *fp;
-static int currRolloverAppend;
-static unsigned long currLogLen;
-static char *defaultFormat = "%t{%Y-%m-%d} %t{%H:%M:%S} %l %cK(%F:%L)%r: %m";
-static char *txtReset = "\x1b[0m";
-static char *txtColors[] = {
+static ClLogProps    gLogProps;
+static ClFmtChunk *  gFmt;
+static int           gFmtLen;
+static FILE *        gFp;
+static int           gCurrRolloverAppend;
+static unsigned long gCurrLogLen;
+static char *        gDefaultFmt = "%t{%Y-%m-%d} %t{%H:%M:%S} %l %cK(%F:%L)%r: %m";
+static char *        gTxtReset = "\x1b[0m";
+static char *        gTxtColors[] = {
   "\x1b[30m", "\x1b[31m", "\x1b[32m", "\x1b[33m", "\x1b[34m", "\x1b[35m", "\x1b[36m", "\x1b[37m",
   "\x1b[90m", "\x1b[91m", "\x1b[92m", "\x1b[93m", "\x1b[94m", "\x1b[95m", "\x1b[96m", "\x1b[97m"
 };
-static const int defaultColors[] = {
+static const int     gDefaultColors[] = {
   13, 9, 11, 10, 12, 14
 };
-static const char *levels[] = {
+static const char *  gLevels[] = {
   "FATAL", "ERROR", "WARN ", "INFO ", "DEBUG", "TRACE"
 };
 
@@ -23,119 +23,126 @@ static unsigned long
 PrintFormat(FILE *p, ClStreams stream, ClMsgLevels level, const char *filename, int line, 
             const char *function, const char *message, va_list args);
 static void 
-ParseFormat(char *fmt);
+ParseFormat(char *format);
 static void 
-CaptureStr(char *fmt, int i, int j);
+CaptureStr(char *format, int i, int j);
 static int 
 ColorCharToIndex(char c);
 
 void ClInitLogProps() {
-  logProps.level = CL_LOG_LEVEL_INFO;
-  logProps.stream = CL_STREAM_ALL;
-  logProps.color = CL_COLOR_ON;
-  logProps.rollover = 1048576;
-  logProps.filename = NULL;
-  logProps.format = defaultFormat;
-  fp = NULL;
-  currRolloverAppend = 1;
-  currLogLen = 0;
-  ParseFormat(logProps.format);
-}
-
-void ClLoadLogProps(ClLogProps props) {
-  if(fp != NULL) {
-    fclose(fp);
-  }
-  logProps.level = props.level;
-  logProps.stream = props.stream;
-  logProps.color = props.color;
-  logProps.rollover = props.rollover;
-  logProps.filename = props.filename;
-  logProps.format = props.format;
-  //TODO: error: handling
-  fp = fopen(logProps.filename, "a");
-  currRolloverAppend = 1;
-  currLogLen = 0;
-  ParseFormat(logProps.format);
-}
-
-void ClResetLogProps() {
-  if(fp != NULL) {
-    fclose(fp);
-  }
-  ClInitLogProps();
+  gLogProps.level = CL_LOG_LEVEL_INFO;
+  gLogProps.stream = CL_STREAM_ALL;
+  gLogProps.color = CL_COLOR_ON;
+  gLogProps.rollover = 1048576;
+  gLogProps.filename = NULL;
+  gLogProps.format = gDefaultFmt;
+  gFp = NULL;
+  gCurrRolloverAppend = 1;
+  gCurrLogLen = 0;
+  ParseFormat(gLogProps.format);
 }
 
 void ClCleanupLogProps() {
-  if(fp != NULL) {
-    fclose(fp);
+  if(gFp != NULL) {
+    fclose(gFp);
+    gFp = NULL;
   }
-  if(formatLen > 0) {
+  if(gFmtLen > 0) {
     int i;
-    for(i = 0; i < formatLen; i++) {
-      if(format[i].type == CL_FMT_TYPE_TIME && format[i].str != NULL) {
-        free(format[i].str);
+    for(i = 0; i < gFmtLen; i++) {
+      if((gFmt[i].type == CL_FMT_TYPE_TIME || 
+          gFmt[i].type == CL_FMT_TYPE_STRING) && 
+          gFmt[i].str != NULL) {
+        free(gFmt[i].str);
       }
     }
-    free(format);
+    free(gFmt);
   }
+}
+
+void ClResetLogProps() {
+  ClCleanupLogProps();
+  ClInitLogProps();
+}
+
+void ClLoadLogProps(ClLogProps props) {
+  ClCleanupLogProps();
+  gLogProps.level = props.level;
+  gLogProps.stream = props.stream;
+  gLogProps.color = props.color;
+  gLogProps.rollover = props.rollover;
+  gLogProps.filename = props.filename;
+  gLogProps.format = props.format;
+  gFp = fopen(gLogProps.filename, "a");
+  gCurrRolloverAppend = 1;
+  gCurrLogLen = 0;
+  ParseFormat(gLogProps.format);
 }
 
 void ClSetPropLevel(ClLogLevels level) {
-  logProps.level = level;
+  gLogProps.level = level;
 }
 
 ClLogLevels ClGetPropLevel() {
-  return logProps.level;
+  return gLogProps.level;
 }
 
 void ClSetPropStream(ClStreams stream) {
-  logProps.stream = stream;
+  gLogProps.stream = stream;
 }
 
 ClStreams ClGetPropStream() {
-  return logProps.stream;
+  return gLogProps.stream;
 }
 
 void ClSetPropColor(ClColor color) {
-  logProps.color = color;
+  gLogProps.color = color;
 }
 
 ClColor ClGetPropColor() {
-  return logProps.color;
+  return gLogProps.color;
 }
 
 void ClSetPropRollover(long rollover) {
   if(rollover < 1024) {
-    logProps.rollover = 1024;
+    gLogProps.rollover = 1024;
   }
   else if(rollover > LONG_MAX) {
-    logProps.rollover = LONG_MAX;
+    gLogProps.rollover = LONG_MAX;
   }
   else {
-    logProps.rollover = rollover;
+    gLogProps.rollover = rollover;
   }
 }
 
 long ClGetPropRollover() {
-  return logProps.rollover;
+  return gLogProps.rollover;
 }
 
 void ClSetPropFilename(char *filename) {
-  logProps.filename = filename;
+  gLogProps.filename = filename;
 }
 
 char *ClGetPropFilename() {
-  return logProps.filename;
+  return gLogProps.filename;
+}
+
+void ClSetPropFormat(char *format) {
+  gLogProps.format = format;
+  ParseFormat(gLogProps.format);
+}
+
+char *ClGetPropFormat() {
+  return gLogProps.format;
 }
 
 void 
 ClLog(ClMsgLevels level, const char *filename, int line, 
       const char *function, const char *message, ...) {
   // Only consider logging if the message's level is within the global level bound
-  if(logProps.level >= (ClLogLevels)level) {
+  if(gLogProps.level >= (ClLogLevels)level) {
     // Only print to the console if enabled
-    if(logProps.stream == CL_STREAM_ALL || logProps.stream == CL_STREAM_CONSOLE) {
+    if(gLogProps.stream == CL_STREAM_ALL || gLogProps.stream == CL_STREAM_CONSOLE) {
       FILE *cp;
       va_list args;
 
@@ -153,42 +160,52 @@ ClLog(ClMsgLevels level, const char *filename, int line,
     }
 
     // Only print to the disk if enabled
-    if(logProps.stream == CL_STREAM_ALL || logProps.stream == CL_STREAM_DISK) {
+    if(gLogProps.stream == CL_STREAM_ALL || gLogProps.stream == CL_STREAM_DISK) {
       va_list args;
 
       // Make sure a valid filename was actually provided
-      if(logProps.filename != NULL) {
+      if(gLogProps.filename != NULL) {
         // Open the file pointer if it wasn't open already
-        if(fp == NULL) {
-          fp = fopen(logProps.filename, "a");
-          currLogLen = ftell(fp);
+        if(gFp == NULL) {
+          gFp = fopen(gLogProps.filename, "a");
+          gCurrLogLen = ftell(gFp);
         }
 
         // Print the logging message along with any option parameters
         va_start(args, message);
-        currLogLen += PrintFormat(fp, CL_STREAM_DISK, level, filename, line, function, message, args);
+        gCurrLogLen += PrintFormat(gFp, CL_STREAM_DISK, level, filename, line, function, message, args);
         va_end(args);
 
+        // If no data was ever written (in the case of an empty format string), close and remove 
+        // the file.
+        if(gCurrLogLen == 0) {
+          fclose(gFp);
+          gFp = NULL;
+          remove(gLogProps.filename);
+        }
+
         // Perform log rollover if necessary
-        if(logProps.rollover < currLogLen) {
-          int len = (int)strlen(logProps.filename);
+        if(gLogProps.rollover < gCurrLogLen) {
+          int len = (int)strlen(gLogProps.filename);
           FILE *tp;
 
           while(1) {
-            char rolledFilename[len+3+(int)floor(log10(currRolloverAppend))];
+            char rolledFilename[len+3+(int)floor(log10(gCurrRolloverAppend))];
 
-            sprintf(rolledFilename, "%s.%d", logProps.filename, currRolloverAppend);
+            sprintf(rolledFilename, "%s.%d", gLogProps.filename, gCurrRolloverAppend);
             tp = fopen(rolledFilename, "r");
             if(tp != NULL) {
               fclose(tp);
-              currRolloverAppend++;
+              tp = NULL;
+              gCurrRolloverAppend++;
             }
             else {
-              fclose(fp);
-              rename(logProps.filename, rolledFilename);
-              fp = fopen(logProps.filename, "a");
-              currRolloverAppend++;
-              currLogLen = 0;
+              fclose(gFp);
+              gFp = NULL;
+              rename(gLogProps.filename, rolledFilename);
+              gFp = fopen(gLogProps.filename, "a");
+              gCurrRolloverAppend++;
+              gCurrLogLen = 0;
               break;
             }
           }
@@ -201,159 +218,176 @@ ClLog(ClMsgLevels level, const char *filename, int line,
 static unsigned long 
 PrintFormat(FILE *p, ClStreams stream, ClMsgLevels level, const char *filename, int line, 
             const char *function, const char *message, va_list args) {
-  int i;
-  int tmLen;
-  int tmMax = 256;
   unsigned long len = 0;
-  char *tm;
-  time_t rawtime;
 
-  for(i = 0; i < formatLen; i++) {
-    switch(format[i].type) {
-      case CL_FMT_TYPE_STRING:
-        len += fprintf(p, "%s", format[i].str);
-        break;
-      case CL_FMT_TYPE_TEXT_COLOR:
-      case CL_FMT_TYPE_TEXT_RESET:
-        if(logProps.color == CL_COLOR_ON && stream == CL_STREAM_CONSOLE) {
-          len += fprintf(p, "%s", format[i].str);
-        }
-        break;
-      case CL_FMT_TYPE_TIME:
-        tm = malloc(tmMax*sizeof(char));
-        time(&rawtime);
-        tmLen = strftime(tm, tmMax, format[i].str, localtime(&rawtime));
-        if(tmLen == 0) {
-          tm[tmMax-1] = '\0';
-        }
-        else {
-          tm = realloc(tm, (tmLen+1)*sizeof(char));
-        }
-        len += fprintf(p, "%s", tm);
-        free(tm);
-        break;
-      case CL_FMT_TYPE_LEVEL:
-        if(logProps.color == CL_COLOR_ON && stream == CL_STREAM_CONSOLE) {
-          len += fprintf(p, "%s%s%s", txtColors[defaultColors[level]], levels[level], txtReset);
-        }
-        else {
-          len += fprintf(p, "%s", levels[level]);
-        }
-        break;
-      case CL_FMT_TYPE_FILENAME:
-        len += fprintf(p, "%s", filename);
-        break;
-      case CL_FMT_TYPE_LINE:
-        len += fprintf(p, "%d", line);
-        break;
-      case CL_FMT_TYPE_FUNCTION:
-        len += fprintf(p, "%s", function);
-        break;
-      case CL_FMT_TYPE_PROCESS_ID:
-        len += fprintf(p, "%d", (int)getpid());
-        break;
-      case CL_FMT_TYPE_MESSAGE:
-        len += vfprintf(p, message, args);
-        break;
-      default:
-        break;
+  // Only print if the custom format is non-empty
+  if(gFmtLen > 0) {
+    int i;
+    int tmLen;
+    int tmMax = 256;
+    char *tm;
+    time_t rawtime;
+
+    for(i = 0; i < gFmtLen; i++) {
+      switch(gFmt[i].type) {
+        case CL_FMT_TYPE_STRING:
+          len += fprintf(p, "%s", gFmt[i].str);
+          break;
+        case CL_FMT_TYPE_TEXT_COLOR:
+        case CL_FMT_TYPE_TEXT_RESET:
+          if(gLogProps.color == CL_COLOR_ON && stream == CL_STREAM_CONSOLE) {
+            len += fprintf(p, "%s", gFmt[i].str);
+          }
+          break;
+        case CL_FMT_TYPE_TIME:
+          tm = malloc(tmMax*sizeof(char));
+          time(&rawtime);
+          tmLen = strftime(tm, tmMax, gFmt[i].str, localtime(&rawtime));
+          if(tmLen == 0) {
+            tm[tmMax-1] = '\0';
+          }
+          else {
+            tm = realloc(tm, (tmLen+1)*sizeof(char));
+          }
+          len += fprintf(p, "%s", tm);
+          free(tm);
+          break;
+        case CL_FMT_TYPE_LEVEL:
+          if(gLogProps.color == CL_COLOR_ON && stream == CL_STREAM_CONSOLE) {
+            len += fprintf(p, "%s%s%s", gTxtColors[gDefaultColors[level]], gLevels[level], gTxtReset);
+          }
+          else {
+            len += fprintf(p, "%s", gLevels[level]);
+          }
+          break;
+        case CL_FMT_TYPE_FILENAME:
+          len += fprintf(p, "%s", filename);
+          break;
+        case CL_FMT_TYPE_LINE:
+          len += fprintf(p, "%d", line);
+          break;
+        case CL_FMT_TYPE_FUNCTION:
+          len += fprintf(p, "%s", function);
+          break;
+        case CL_FMT_TYPE_PROCESS_ID:
+          len += fprintf(p, "%d", (int)getpid());
+          break;
+        case CL_FMT_TYPE_MESSAGE:
+          len += vfprintf(p, message, args);
+          break;
+        default:
+          break;
+      }
     }
+
+    len += fprintf(p, "\n");
+    fflush(p);
   }
 
-  len += fprintf(p, "\n");
-  fflush(p);
   return len;
 }
 
 static void 
-ParseFormat(char *fmt) {
+ParseFormat(char *format) {
   int i;
   int j;
   int colorIdx;
-  int len = strlen(fmt);
+  int len = strlen(format);
   char c;
 
-  formatLen = 0;
+  gFmtLen = 0;
   for(i = 0, j = 0; i < len; i++) {
-    if(fmt[i] == '%') {
-      switch(fmt[i+1]) {
+    if(format[i] == '%') {
+      switch(format[i+1]) {
         case 'c':
-          colorIdx = ColorCharToIndex(fmt[i+2]);
+          colorIdx = ColorCharToIndex(format[i+2]);
           if(colorIdx != -1) {
-            CaptureStr(fmt, i, j);
-            format[formatLen].type = CL_FMT_TYPE_TEXT_COLOR;
-            format[formatLen].str = txtColors[colorIdx];
-            formatLen++;
+            CaptureStr(format, i, j);
+            gFmt[gFmtLen].type = CL_FMT_TYPE_TEXT_COLOR;
+            gFmt[gFmtLen].str = gTxtColors[colorIdx];
+            gFmtLen++;
             i += 2;
             j = i + 1;
           }
+          else {
+            i++;
+          }
           break;
         case 'r':
-          CaptureStr(fmt, i, j);
-          format[formatLen].type = CL_FMT_TYPE_TEXT_RESET;
-          format[formatLen].str = txtReset;
-          formatLen++;
+          CaptureStr(format, i, j);
+          gFmt[gFmtLen].type = CL_FMT_TYPE_TEXT_RESET;
+          gFmt[gFmtLen].str = gTxtReset;
+          gFmtLen++;
           i++;
           j = i + 1;
           break;
         case 't':
-          if(fmt[i+2] == '{') {
-            CaptureStr(fmt, i, j);
-            format[formatLen].type = CL_FMT_TYPE_TIME;
+          if(format[i+2] == '{') {
+            int oldI = i;
+            int oldJ = j;
             i += 2;
             j = i + 1;
             do {
               i++;
-              c = fmt[i];
+              c = format[i];
             } while(c != '}' && c != '\0');
-            if(i-j != 0) {
-              format[formatLen].str = malloc((i-j+1)*sizeof(char));
-              strncpy(format[formatLen].str, fmt+j, i-j);
-              format[formatLen].str[i-j] = '\0';
-              formatLen++;
+            if(c == '}') {
+              CaptureStr(format, oldI, oldJ);
+              gFmt[gFmtLen].type = CL_FMT_TYPE_TIME;
+              gFmt[gFmtLen].str = malloc((i-j+1)*sizeof(char));
+              strncpy(gFmt[gFmtLen].str, format+j, i-j);
+              gFmt[gFmtLen].str[i-j] = '\0';
+              gFmtLen++;
               j = i + 1;
             }
+            else {
+              i = oldI + 1;
+              j = oldJ;
+            }
+          }
+          else {
+            i++;
           }
           break;
         case 'l':
-          CaptureStr(fmt, i, j);
-          format[formatLen].type = CL_FMT_TYPE_LEVEL;
-          formatLen++;
+          CaptureStr(format, i, j);
+          gFmt[gFmtLen].type = CL_FMT_TYPE_LEVEL;
+          gFmtLen++;
           i++;
           j = i + 1;
           break;
         case 'F':
-          CaptureStr(fmt, i, j);
-          format[formatLen].type = CL_FMT_TYPE_FILENAME;
-          formatLen++;
+          CaptureStr(format, i, j);
+          gFmt[gFmtLen].type = CL_FMT_TYPE_FILENAME;
+          gFmtLen++;
           i++;
           j = i + 1;
           break;
         case 'L':
-          CaptureStr(fmt, i, j);
-          format[formatLen].type = CL_FMT_TYPE_LINE;
-          formatLen++;
+          CaptureStr(format, i, j);
+          gFmt[gFmtLen].type = CL_FMT_TYPE_LINE;
+          gFmtLen++;
           i++;
           j = i + 1;
           break;
         case 'f':
-          CaptureStr(fmt, i, j);
-          format[formatLen].type = CL_FMT_TYPE_FUNCTION;
-          formatLen++;
+          CaptureStr(format, i, j);
+          gFmt[gFmtLen].type = CL_FMT_TYPE_FUNCTION;
+          gFmtLen++;
           i++;
           j = i + 1;
           break;
         case 'p':
-          CaptureStr(fmt, i, j);
-          format[formatLen].type = CL_FMT_TYPE_PROCESS_ID;
-          formatLen++;
+          CaptureStr(format, i, j);
+          gFmt[gFmtLen].type = CL_FMT_TYPE_PROCESS_ID;
+          gFmtLen++;
           i++;
           j = i + 1;
           break;
         case 'm':
-          CaptureStr(fmt, i, j);
-          format[formatLen].type = CL_FMT_TYPE_MESSAGE;
-          formatLen++;
+          CaptureStr(format, i, j);
+          gFmt[gFmtLen].type = CL_FMT_TYPE_MESSAGE;
+          gFmtLen++;
           i++;
           j = i + 1;
           break;
@@ -362,24 +396,34 @@ ParseFormat(char *fmt) {
       }
     }
   }
+  if(i-j > 0) {
+    gFmt = (gFmtLen == 0) ? 
+            malloc(sizeof(ClFmtChunk)) : 
+            realloc(gFmt, (gFmtLen+1)*sizeof(ClFmtChunk));
+    gFmt[gFmtLen].type = CL_FMT_TYPE_STRING;
+    gFmt[gFmtLen].str = malloc((i-j+1)*sizeof(char));
+    strncpy(gFmt[gFmtLen].str, format+j, i-j);
+    gFmt[gFmtLen].str[i-j] = '\0';
+    gFmtLen++;
+  }
 }
 
 static void 
-CaptureStr(char *fmt, int i, int j) {
+CaptureStr(char *format, int i, int j) {
   if(i-j > 0) {
-    format = (formatLen == 0) ? 
+    gFmt = (gFmtLen == 0) ? 
               malloc(2*sizeof(ClFmtChunk)) : 
-              realloc(format, (formatLen+2)*sizeof(ClFmtChunk));
-    format[formatLen].type = CL_FMT_TYPE_STRING;
-    format[formatLen].str = malloc((i-j+1)*sizeof(char));
-    strncpy(format[formatLen].str, fmt+j, i-j);
-    format[formatLen].str[i-j] = '\0';
-    formatLen++;
+              realloc(gFmt, (gFmtLen+2)*sizeof(ClFmtChunk));
+    gFmt[gFmtLen].type = CL_FMT_TYPE_STRING;
+    gFmt[gFmtLen].str = malloc((i-j+1)*sizeof(char));
+    strncpy(gFmt[gFmtLen].str, format+j, i-j);
+    gFmt[gFmtLen].str[i-j] = '\0';
+    gFmtLen++;
   }
   else {
-    format = (formatLen == 0) ? 
+    gFmt = (gFmtLen == 0) ? 
               malloc(sizeof(ClFmtChunk)) : 
-              realloc(format, (formatLen+1)*sizeof(ClFmtChunk));
+              realloc(gFmt, (gFmtLen+1)*sizeof(ClFmtChunk));
   }
 }
 
