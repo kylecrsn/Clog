@@ -18,7 +18,7 @@ jobs:
             git config --global user.email "carsonkk@users.noreply.github.com"
             git config --global user.name "carsonkk"
             echo "machine github.com login carsonkk password $GITHUB_TOKEN" > ~/.netrc
-            cd docs/website && npm install && GIT_USER=carsonkk USE_SSH=true npm run publish-gh-pages
+            cd docs/website && npm install && GIT_USER=carsonkk npm run publish-gh-pages
 workflows:
   version: 2
   build_and_deploy:
