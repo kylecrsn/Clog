@@ -9,7 +9,7 @@ TARGETS = $(SOURCES:.c=)
 
 $(TARGETS): $(OBJECTS)
 	$(MKD) $(OUT)
-	for f in $(TARGETS); do $(CC) $(CL_OBJ) -lm $(OUT)/$$f.o -o $(OUT)/$$f; done
+	for f in $(TARGETS); do $(CC) $(CL_OBJ) -lm -luuid $(OUT)/$$f.o -o $(OUT)/$$f; done
 
 $(OBJECTS): $(SOURCES)
 	$(MKD) $(OUT)

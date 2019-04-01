@@ -12,6 +12,7 @@ NOTES.md
 # Precompiled headers
 *.gch
 *.pch
+ipch/
 
 # Libraries
 *.lib
